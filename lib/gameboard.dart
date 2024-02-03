@@ -43,8 +43,9 @@ class _GameBoardState extends State<GameBoard> {
   void initState() {
     super.initState();
     _initBoard();
+    //buildBoardFromFEN("r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K");
   }
-
+  //BUILD NORMAL BOARD
   void _initBoard() {
 
     //fills board with nulls
@@ -153,6 +154,35 @@ class _GameBoardState extends State<GameBoard> {
 
     board = newBoard;
   }
+
+  //BUILD PUZZLE BOARD OFF FEN
+  void buildBoardFromFEN(String fen) {
+  List<List<ChessPiece?>> newBoard = 
+      List.generate(8, (index) => List.generate(8, (index) => null));
+  List<String> fenParts = fen.split(' ');
+  List<String> rows = fenParts[0].split('/');
+
+  for (int row = 0; row < 8; row++) {
+    int col = 0;
+    for (int index = 0; index < rows[row].length; index++) {
+      String char = rows[row][index];
+      if (int.tryParse(char) != null) {
+        col += int.parse(char);
+      } else {
+        newBoard[row][col] = createPieceFromFENChar(char);
+        col++;
+      }
+    }
+  }
+
+  // Update the board state and other game-related states if necessary
+  setState(() {
+    board = newBoard;
+    isWhiteTurn = fenParts[0] == true; // Update turn based on FEN
+
+    // You can add more state updates based on other parts of the FEN string like castling rights, en passant, etc.
+  });
+}
 
   //USER SELECTED A PIECE
   void pieceSelected(int row, int col) {
@@ -514,6 +544,7 @@ class _GameBoardState extends State<GameBoard> {
     return !kingInCheck;
   }
 
+  //Check for checkmate
   bool isCheckMate(bool isWhiteKing) {
     //if king is not in check then its not checkmate
     if(!isKingInCheck(isWhiteKing)) {
@@ -539,9 +570,51 @@ class _GameBoardState extends State<GameBoard> {
     return true;
   }
 
+  //Genereate FEN
+  String generateFEN() {
+    String fen = "";
+
+    for (int row = 0; row < 8; row++) {
+      int emptyCount = 0;
+
+      for (int col = 0; col < 8; col++) {
+        ChessPiece? piece = board[row][col];
+
+        if (piece == null) {
+          emptyCount++;
+        } else {
+          if (emptyCount > 0) {
+            fen += emptyCount.toString();
+            emptyCount = 0;
+          }
+          String pieceCode = getPieceCode(piece);
+          fen += piece.isWhite ? pieceCode.toUpperCase() : pieceCode.toLowerCase();
+        }
+      }
+
+      if (emptyCount > 0) {
+        fen += emptyCount.toString();
+      }
+
+      if (row < 7) {
+        fen += '/';
+      }
+  }
+
+  // Add the active color, castling availability, en passant, halfmove, and fullmove
+  fen += ' ${isWhiteTurn ? 'w' : 'b'}';
+  // Placeholder for castling availability, en passant, halfmove clock, and fullmove number. You might need to adjust these based on your game state.
+  fen += ' - - 0 1';
+
+  return fen;
+}
+
+
+
   void resetGame() {
     Navigator.pop(context);
     _initBoard();
+    // buildBoardFromFEN("r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K");
     checkStatus = false;
     isWhiteTurn = true;
     whitePiecesTaken.clear();
@@ -633,3 +706,6 @@ class _GameBoardState extends State<GameBoard> {
         );
   }
 }
+
+
+
