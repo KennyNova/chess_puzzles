@@ -21,6 +21,10 @@ class _GameBoardState extends State<GameBoard> {
   int selectedRow = -1;
   int selectedCol = -1;
 
+  ChessPiece? lastMovedPiece;
+  List<int>? lastMoveStart;
+  List<int>? lastMoveEnd;
+
   //list of valid moves for selected piece
   //each move is represented as a row and col
   List<List<int>> validMoves = [];
@@ -231,27 +235,47 @@ class _GameBoardState extends State<GameBoard> {
       case ChessPieceType.pawn:
         //checks if square is not occupied
         if(isInBoard(row + direction, col) &&
-         board[row + direction][col] == null) {
-          candidateMoves.add([row + direction, col]);
+          board[row + direction][col] == null) {
+          candidateMoves.add([row + direction, col, 0]);
         }
         //first pawn move goes 2 spaces
         if((row == 1 && !piece.isWhite) || (row == 6 && piece.isWhite)) {
           if(isInBoard(row + 2 * direction, col) &&
            board[row+2*direction][col] == null &&
            board[row + direction][col] == null) {
-           candidateMoves.add([row + 2 * direction, col]);
+           candidateMoves.add([row + 2 * direction, col, 0]);
           }
         }
         //take piece if diagonal
         if(isInBoard(row + direction, col - 1) &&
          board[row + direction][col - 1] != null &&
          board[row + direction][col - 1]!.isWhite != piece.isWhite) {
-          candidateMoves.add([row + direction, col-1]);
+          candidateMoves.add([row + direction, col-1, 1]);
         }
         if(isInBoard(row + direction, col + 1) &&
          board[row + direction][col + 1] != null &&
          board[row + direction][col + 1]!.isWhite != piece.isWhite) {
-          candidateMoves.add([row + direction, col + 1]);
+          candidateMoves.add([row + direction, col + 1, 1]);
+        }
+
+        //en passant
+        if (row == (piece.isWhite ? 3 : 4)) { // Pawns can only capture en passant on these ranks
+          List<int> sides = [col - 1, col + 1];
+          for (int sideCol in sides) {
+            if (sideCol >= 0 && sideCol < 8) {
+              ChessPiece? adjacentPiece = board[row][sideCol];
+              // Check if the adjacent piece is a pawn of the opposite color and it just moved 2 squares
+              if (adjacentPiece != null &&
+                  adjacentPiece.type == ChessPieceType.pawn &&
+                  adjacentPiece.isWhite != piece.isWhite &&
+                  lastMovedPiece == adjacentPiece &&
+                  lastMoveStart![0] == (piece.isWhite ? 1 : 6) &&
+                  lastMoveEnd![0] == (piece.isWhite ? 3 : 4)) {
+                // Add en passant capture move
+                candidateMoves.add([piece.isWhite ? 2 : 5, sideCol, 1]);
+              }
+            }
+          }
         }
         break;
       case ChessPieceType.rook:
@@ -273,11 +297,11 @@ class _GameBoardState extends State<GameBoard> {
             }
             if(board[newRow][newCol] != null) {
               if(board[newRow][newCol]!.isWhite != piece.isWhite){
-                candidateMoves.add([newRow, newCol]); //capture
+                candidateMoves.add([newRow, newCol, 1]); //capture
               }
               break; //blocked
             }
-            candidateMoves.add([newRow, newCol]);
+            candidateMoves.add([newRow, newCol, 0]);//move normally
             i++;
           }
         }
@@ -301,11 +325,11 @@ class _GameBoardState extends State<GameBoard> {
           }
           if(board[newRow][newCol] != null){
             if (board[newRow][newCol]!.isWhite != piece.isWhite){
-              candidateMoves.add([newRow, newCol]); //capture
+              candidateMoves.add([newRow, newCol, 1]); //capture
             }
             continue; //blocked
           }
-          candidateMoves.add([newRow, newCol]);
+          candidateMoves.add([newRow, newCol, 0]); //move normally
         }
         break;
       case ChessPieceType.bishop:
@@ -326,11 +350,11 @@ class _GameBoardState extends State<GameBoard> {
             }
             if(board[newRow][newCol] != null){
               if(board[newRow][newCol]!.isWhite != piece.isWhite){
-                candidateMoves.add([newRow, newCol]); //capture
+                candidateMoves.add([newRow, newCol, 1]); //capture
               }
               break; //blocked
             }
-            candidateMoves.add([newRow, newCol]);
+            candidateMoves.add([newRow, newCol, 0]); //move normally
             i++;
           }
         }
@@ -358,11 +382,11 @@ class _GameBoardState extends State<GameBoard> {
             }
             if(board[newRow][newCol] != null) {
               if(board[newRow][newCol]!.isWhite != piece.isWhite){
-                candidateMoves.add([newRow, newCol]); //capture
+                candidateMoves.add([newRow, newCol, 1]); //capture
               }
               break; //blocked
             }
-            candidateMoves.add([newRow, newCol]);
+            candidateMoves.add([newRow, newCol, 0]); //move normally
             i++;
           }
         }
@@ -387,12 +411,12 @@ class _GameBoardState extends State<GameBoard> {
           }
           if (board[newRow][newCol] != null) {
             if(board[newRow][newCol]!.isWhite != piece.isWhite) {
-              candidateMoves.add([newRow, newCol]); //capture
+              candidateMoves.add([newRow, newCol, 1]); //capture
             }
             continue;
           }
 
-          candidateMoves.add([newRow,newCol]);
+          candidateMoves.add([newRow,newCol, 0]); //move normally
         }
         break;
       default:
@@ -435,8 +459,34 @@ class _GameBoardState extends State<GameBoard> {
       }
     }
 
-    //check if moved piece is a king
+      // If moved piece is a king, update its position
+    if (selectedPiece!.type == ChessPieceType.king) {
+      if (selectedPiece!.isWhite) {
+        whiteKingPosition = [newRow, newCol];
+      } else {
+        blackKingPosition = [newRow, newCol];
+      }
+    }
 
+    if (selectedPiece!.type == ChessPieceType.pawn &&
+      lastMovedPiece != null &&
+      lastMovedPiece!.type == ChessPieceType.pawn &&
+      (newRow == 2 || newRow == 5) && // Capturing pawn must land on these ranks
+      (newRow - selectedRow).abs() == 1 && // Must move diagonally (1 row difference)
+      (newCol - selectedCol).abs() == 1 && // Must move diagonally (1 column difference)
+      lastMoveStart![0] == (isWhiteTurn ? 1 : 6) && // Last moved pawn must have moved from its original position
+      lastMoveEnd![0] == (isWhiteTurn ? 3 : 4) && // Last moved pawn must have moved two squares
+      lastMoveEnd![1] == newCol) { // Last moved pawn must be in the same column as the capturing pawn's destination
+    // Remove the captured pawn
+    board[lastMoveEnd![0]][newCol] = null;
+
+    // Add the captured pawn to the list of taken pieces
+    if(isWhiteTurn) {
+      blackPiecesTaken.add(lastMovedPiece!);
+    } else {
+      whitePiecesTaken.add(lastMovedPiece!);
+    }
+  }
 
     //move peice and clear old spot
     board[newRow][newCol] = selectedPiece;
@@ -449,6 +499,12 @@ class _GameBoardState extends State<GameBoard> {
       checkStatus = false;
     }
 
+    //save last moved piece for  en passant
+    lastMovedPiece = selectedPiece;
+    lastMoveStart = [selectedRow, selectedCol];
+    lastMoveEnd = [newRow, newCol];
+
+    
 
     //clear selection
     setState(() {
@@ -467,7 +523,7 @@ class _GameBoardState extends State<GameBoard> {
           actions: [
             TextButton(
               onPressed: resetGame,
-               child: const Text("Play Again")
+              child: const Text("Play Again")
             ),
           ]
         ),
@@ -612,7 +668,7 @@ class _GameBoardState extends State<GameBoard> {
 
 
   void resetGame() {
-    Navigator.pop(context);
+    // Navigator.pop(context);
     _initBoard();
     // buildBoardFromFEN("r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K");
     checkStatus = false;
@@ -622,6 +678,10 @@ class _GameBoardState extends State<GameBoard> {
     setState(() {
       whiteKingPosition = [7,4];
       blackKingPosition = [0,4];
+      selectedPiece = null;
+      selectedRow = -1;
+      selectedCol = -1;
+      validMoves = [];
     });
 
   }
@@ -647,6 +707,7 @@ class _GameBoardState extends State<GameBoard> {
                   ),
             ),
 
+            
 
             //Game Status
             Text(checkStatus ? "CHECK!" : ""),
@@ -669,9 +730,12 @@ class _GameBoardState extends State<GameBoard> {
               
                     //check if valid move
                     bool isValidMove = false;
+                    bool isCaptureMove = false;
+
                     for (var position in validMoves) {
                       if(position[0] == row && position[1] == col){
                         isValidMove = true;
+                        isCaptureMove = position.length > 2 && position[2] == 1;
                       }
                     }
               
@@ -682,11 +746,33 @@ class _GameBoardState extends State<GameBoard> {
                       isSelected: isSelected,
                       isValidMove: isValidMove,
                       onTap: () => pieceSelected(row, col),
+                      isCaptureMove: isCaptureMove,
                     );
                   },
                   ),
             ),
-
+            Expanded(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: TextButton(
+                  style: ButtonStyle(
+                    foregroundColor: MaterialStateProperty.all<Color>(Colors.blue),
+                    overlayColor: MaterialStateProperty.resolveWith<Color?>(
+                      (Set<MaterialState> states) {
+                        if (states.contains(MaterialState.hovered))
+                          return Colors.blue.withOpacity(0.04);
+                        if (states.contains(MaterialState.focused) ||
+                            states.contains(MaterialState.pressed))
+                          return Colors.blue.withOpacity(0.12);
+                        return null; // Defer to the widget's default.
+                      },
+                    ),
+                  ),
+                  onPressed: resetGame,
+                  child: const Text('Reset'),
+                ),
+              ),
+            ),
 
             //Black Pieces taken
             Expanded(
