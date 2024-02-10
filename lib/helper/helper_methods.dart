@@ -66,3 +66,41 @@ ChessPiece? createPieceFromFENChar(String fenChar) {
   }
   return null;
 }
+
+String getImagePathForPieceType(ChessPieceType type, bool isWhite) {
+  // Mapping of ChessPieceType to a one-letter notation
+  Map<ChessPieceType, String> typeNotation = {
+    ChessPieceType.pawn: 'p',
+    ChessPieceType.rook: 'r',
+    ChessPieceType.knight: 'n',
+    ChessPieceType.bishop: 'b',
+    ChessPieceType.queen: 'q',
+    ChessPieceType.king: 'k',
+  };
+
+  // Get the one-letter notation for the given type
+  String notation = typeNotation[type] ?? '';
+
+  // Determine the color suffix
+  String colorSuffix = isWhite ? 'w' : 'b';
+
+  // Construct and return the image path
+  return 'lib/images/$notation$colorSuffix.jpg';
+}
+
+
+// Helper method to get a display name for a piece type
+String getNameForPieceType(ChessPieceType type) {
+  switch (type) {
+    case ChessPieceType.queen:
+      return 'Queen';
+    case ChessPieceType.rook:
+      return 'Rook';
+    case ChessPieceType.bishop:
+      return 'Bishop';
+    case ChessPieceType.knight:
+      return 'Knight';
+    default:
+      return '';
+  }
+}

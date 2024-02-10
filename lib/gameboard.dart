@@ -459,6 +459,62 @@ class _GameBoardState extends State<GameBoard> {
       }
     }
 
+// Pawn Promotion logic
+if (selectedPiece!.type == ChessPieceType.pawn && (newRow == 0 || newRow == 7)) {
+  // Save the current state before showing the dialog
+  ChessPiece? originalPiece = selectedPiece;
+  ChessPiece? capturedPiece = board[newRow][newCol]; // Save the captured piece, if any
+  int originalRow = selectedRow;
+  int originalCol = selectedCol;
+
+  // Show dialog for pawn promotion
+  showDialog(
+    context: context,
+    barrierDismissible: true, // This allows dismissal by tapping outside the dialog
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text("Pawn Promotion"),
+        content: const Text("Choose piece to promote to:"),
+        actions: <ChessPieceType>[ChessPieceType.queen, ChessPieceType.rook, ChessPieceType.bishop, ChessPieceType.knight]
+            .map((type) => TextButton(
+                  onPressed: () {
+                    // Replace pawn with new piece
+                    setState(() {
+                      board[newRow][newCol] = ChessPiece(
+                        type: type, // The type chosen by the user
+                        isWhite: originalPiece!.isWhite,
+                        imagePath: getImagePathForPieceType(type, originalPiece.isWhite),
+                      );
+                      Navigator.of(context).pop(true); // Close the dialog and indicate a selection was made
+                    });
+                    // After state is set and dialog is closed, check for check condition again
+                    Future.microtask(() => setState(() {
+                      checkStatus = isKingInCheck(originalPiece!.isWhite); // Re-check if the king is in check
+                    }));
+                  },
+                  child: Text(getNameForPieceType(type)), // A method to get the name of the piece type
+                ))
+            .toList(),
+      );
+    },
+  ).then((selectionMade) {
+    if (selectionMade == null || !selectionMade) {
+      // User dismissed the dialog without making a selection, revert the move
+      setState(() {
+        // Revert the board and selected piece to their states before the promotion attempt
+        board[originalRow][originalCol] = originalPiece; // Move the pawn back to its original position
+        board[newRow][newCol] = capturedPiece; // Restore the captured piece, if there was one
+        selectedPiece = null; // Clear the selected piece
+        selectedRow = -1; // Reset selected row
+        selectedCol = -1; // Reset selected column
+        isWhiteTurn = !isWhiteTurn;
+        // Optionally, revert any additional state changes made during the move
+      });
+    }
+  });
+}
+
+
       // If moved piece is a king, update its position
     if (selectedPiece!.type == ChessPieceType.king) {
       if (selectedPiece!.isWhite) {
@@ -527,7 +583,7 @@ class _GameBoardState extends State<GameBoard> {
             ),
           ]
         ),
-       );
+       ); // Close the dialog
     }
 
     //change turn
@@ -721,32 +777,37 @@ class _GameBoardState extends State<GameBoard> {
                   gridDelegate: 
                     const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 8 ),
                   itemBuilder: (context, index) {
-              
-                    //get row and col position of this square
-                    int row = index ~/8;
+                    // Calculate row and col based on index as you already do
+                    int row = index ~/ 8;
                     int col = index % 8;
-              
+
+                    // Determine if the square is the king's position and if the king is in check
+                    bool isKingSquareInCheck = false;
+                    if ((isWhiteTurn && whiteKingPosition[0] == row && whiteKingPosition[1] == col && checkStatus) ||
+                        (!isWhiteTurn && blackKingPosition[0] == row && blackKingPosition[1] == col && checkStatus)) {
+                      isKingSquareInCheck = true;
+                    }
+
+                    // Continue with your existing logic for isSelected, isValidMove, and isCaptureMove
                     bool isSelected = selectedRow == row && selectedCol == col;
-              
-                    //check if valid move
                     bool isValidMove = false;
                     bool isCaptureMove = false;
-
                     for (var position in validMoves) {
                       if(position[0] == row && position[1] == col){
                         isValidMove = true;
                         isCaptureMove = position.length > 2 && position[2] == 1;
                       }
                     }
-              
-              
+
+                    // Render the Square widget, now passing in the new isInCheck parameter
                     return Square(
                       isWhite: isWhite(index),
                       piece: board[row][col],
                       isSelected: isSelected,
                       isValidMove: isValidMove,
-                      onTap: () => pieceSelected(row, col),
                       isCaptureMove: isCaptureMove,
+                      onTap: () => pieceSelected(row, col),
+                      isInCheck: isKingSquareInCheck, // Use the new parameter here
                     );
                   },
                   ),
