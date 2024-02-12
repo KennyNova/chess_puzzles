@@ -182,7 +182,7 @@ class _GameBoardState extends State<GameBoard> {
   // Update the board state and other game-related states if necessary
   setState(() {
     board = newBoard;
-    isWhiteTurn = fenParts[0] == true; // Update turn based on FEN
+    isWhiteTurn = fenParts[0] == 'w'; // Update turn based on FEN
 
     // You can add more state updates based on other parts of the FEN string like castling rights, en passant, etc.
   });
@@ -820,11 +820,13 @@ if (selectedPiece!.type == ChessPieceType.pawn && (newRow == 0 || newRow == 7)) 
                     foregroundColor: MaterialStateProperty.all<Color>(Colors.blue),
                     overlayColor: MaterialStateProperty.resolveWith<Color?>(
                       (Set<MaterialState> states) {
-                        if (states.contains(MaterialState.hovered))
+                        if (states.contains(MaterialState.hovered)) {
                           return Colors.blue.withOpacity(0.04);
+                        }
                         if (states.contains(MaterialState.focused) ||
-                            states.contains(MaterialState.pressed))
+                            states.contains(MaterialState.pressed)) {
                           return Colors.blue.withOpacity(0.12);
+                        }
                         return null; // Defer to the widget's default.
                       },
                     ),
